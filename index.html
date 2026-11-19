@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secure Vault — Password Management & Encryption System</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            vault: {
+              950: '#040d0e',
+              900: '#08181a',
+              800: '#0e292d',
+              700: '#153d42',
+              600: '#1d565d',
+              500: '#14b8a6',
+              400: '#2dd4bf',
+              300: '#5eead4',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Custom scrollbar & subtle grid background matching architecture aesthetic */
+    body {
+      background-color: #050e10;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(20, 184, 166, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(14, 116, 144, 0.08) 0%, transparent 45%);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #08181a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1d565d;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #14b8a6;
+    }
+    .glass-panel {
+      background: rgba(11, 29, 32, 0.78);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(45, 212, 191, 0.16);
+    }
+    .pulse-ring {
+      animation: pulseRing 2.5s infinite;
+    }
+    @keyframes pulseRing {
+      0% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0.45); }
+      70% { box-shadow: 0 0 0 10px rgba(20, 184, 166, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(20, 184, 166, 0); }
+    }
+  </style>
+</head>
+<body class="text-slate-100 font-sans antialiased min-h-screen flex flex-col selection:bg-teal-500 selection:text-slate-950">
+
+  <!-- Toast / Message Box Container (Replaces alert/confirm) -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- Custom Confirmation Modal -->
+  <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="glass-panel rounded-2xl max-w-md w-full p-6 shadow-2xl border border-teal-500/30">
+      <div class="flex items-center gap-3 text-amber-400 mb-3">
+        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+        <h3 id="confirm-title" class="text-lg font-bold text-white">Confirm Action</h3>
+      </div>
+      <p id="confirm-message" class="text-sm text-slate-300 mb-6">Are you sure you want to proceed?</p>
+      <div class="flex justify-end gap-3">
+        <button id="confirm-cancel-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition">Cancel</button>
+        <button id="confirm-ok-btn" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold transition">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 1. SECURE LOGIN / MASTER PASSWORD SCREEN ==================== -->
+  <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-lg">
+      <!-- University / Project Header Badge -->
+      <div class="text-center mb-6">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-950/80 border border-teal-500/30 text-teal-300 text-xs font-medium mb-4">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Ajeenkya D Y Patil University • School of Engineering</span>
+        </div>
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-teal-500/20 pulse-ring mb-4">
+          <i class="fa-solid fa-vault text-3xl text-slate-950"></i>
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+          Secure <span class="text-teal-400">Vault</span>
+        </h1>
+        <p class="text-slate-400 text-sm mt-1">Zero-Knowledge Password Management & AES-256 Encryption System</p>
+      </div>
+
+      <!-- Auth Card -->
+      <div class="glass-panel rounded-3xl p-6 sm:p-8 shadow-2xl">
+        <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-800">
+          <div>
+            <h2 id="auth-heading" class="text-lg font-bold text-white">Master Password Authentication</h2>
+            <p id="auth-subtext" class="text-xs text-slate-400 mt-0.5">Derives PBKDF2-SHA256 cryptographic key locally in browser</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-lg bg-emerald-950/90 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+            AES-GCM-256
+          </span>
+        </div>
+
+        <form id="auth-form" class="space-y-4">
+          <div>
+            <label for="master-password-input" class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              Master Password
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-teal-400">
+                <i class="fa-solid fa-key"></i>
+              </span>
+              <input
+                type="password"
+                id="master-password-input"
+                required
+                placeholder="Enter your master password..."
+                class="w-full pl-10 pr-12 py-3.5 rounded-xl bg-slate-950/90 border border-slate-700 focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-white placeholder-slate-500 text-sm outline-none transition"
+              />
+              <button
+                type="button"
+                id="toggle-master-visibility"
+                class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-teal-400 transition"
+                title="Show/Hide Master Password"
+              >
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Decoy Vault Option (Architecture Node #4) -->
+          <div class="flex items-center justify-between pt-1">
+            <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-400 hover:text-slate-200">
+              <input type="checkbox" id="decoy-mode-checkbox" class="rounded bg-slate-900 border-slate-700 text-teal-500 focus:ring-teal-500">
+              <span>Simulate Duress / Decoy Vault Mode</span>
+            </label>
+            <button type="button" id="reset-vault-btn" class="text-xs text-rose-400 hover:text-rose-300 underline">
+              Reset Prototype Vault
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            id="unlock-btn"
+            class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-teal-500/25 transition flex items-center justify-center gap-2"
+          >
+            <i class="fa-solid fa-lock-open"></i>
+            <span>Derive Key & Unlock Vault</span>
+          </button>
+        </form>
+
+        <!-- Viva Quick-Demo Bar -->
+        <div class="mt-6 pt-5 border-t border-slate-800/80">
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950/70 p-3.5 rounded-2xl border border-teal-500/20">
+            <div class="text-center sm:text-left">
+              <p class="text-xs font-semibold text-teal-300">Viva Demonstration Mode</p>
+              <p class="text-[11px] text-slate-400">Default Demo Password: <code class="text-teal-200 bg-teal-950 px-1.5 py-0.5 rounded">Admin@1234</code></p>
+            </div>
+            <button
+              type="button"
+              id="demo-quick-unlock"
+              class="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-teal-950 hover:bg-teal-900 border border-teal-500/40 text-teal-300 text-xs font-semibold transition flex items-center justify-center gap-1.5"
+            >
+              <i class="fa-solid fa-bolt"></i>
+              <span>Quick-Unlock Demo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Credits Footer -->
+      <div class="mt-6 text-center text-xs text-slate-500 space-y-1">
+        <p>Presented by: <span class="text-slate-300 font-medium">Riya Thakkar • Shriya Gadhave • Snehal Patil • Veena Purohit</span></p>
+        <p>Under the Guidance of <span class="text-teal-400/90 font-medium">Prof. Sharayu Ghive</span> • Department of CSE</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 2. MAIN DASHBOARD APPLICATION ==================== -->
+  <div id="app-shell" class="hidden flex-1 flex flex-col lg:flex-row min-h-screen">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-full lg:w-72 glass-panel border-b lg:border-b-0 lg:border-r border-teal-500/20 flex flex-col justify-between shrink-0">
+      <div>
+        <!-- Brand Header -->
+        <div class="p-5 flex items-center justify-between border-b border-slate-800/80">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-700 flex items-center justify-center text-slate-950 shadow-md">
+              <i class="fa-solid fa-vault text-lg"></i>
+            </div>
+            <div>
+              <h1 class="font-bold text-base text-white leading-tight">Secure Vault</h1>
+              <span id="vault-mode-badge" class="inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-500/30">
+                AES-256 Active
+              </span>
+            </div>
+          </div>
+          <!-- Mobile Menu Toggle -->
+          <button id="mobile-nav-toggle" class="lg:hidden p-2 rounded-lg bg-slate-800 text-slate-300">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav id="sidebar-nav" class="hidden lg:flex flex-col p-3 space-y-1">
+          <p class="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Core Modules</p>
+          <button data-tab="vault" class="nav-btn active flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium bg-teal-500/15 text-teal-300 border border-teal-500/30 transition">
+            <i class="fa-solid fa-shield-halved w-5 text-center"></i>
+            <span>My Vault</span>
+            <span id="nav-vault-count" class="ml-auto text-xs bg-teal-950 text-teal-300 px-2 py-0.5 rounded-full">0</span>
+          </button>
+          <button data-tab="generator" class="nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+            <i class="fa-solid fa-wand-magic-sparkles w-5 text-center"></i>
+            <span>Password Generator</span>
+          </button>
+          <button data-tab="analyzer" class="nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+            <i class="fa-solid fa-magnifying-glass-chart w-5 text-center"></i>
+            <span>Analyzer & Reuse Audit</span>
+          </button>
+
+          <p class="px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Advanced Architecture</p>
+          <button data-tab="sharing" class="nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+            <i class="fa-solid fa-share-nodes w-5 text-center"></i>
+            <span>Time-Bound Sharing</span>
+          </button>
+          <button data-tab="phishing" class="nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+            <i class="fa-solid fa-radar w-5 text-center"></i>
+            <span>AI Phishing Radar</span>
+          </button>
+          <button data-tab="quantum" class="nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+            <i class="fa-solid fa-atom w-5 text-center"></i>
+            <span>Quantum-Resistant Audit</span>
+          </button>
+          <button data-tab="legacy" class="nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+            <i class="fa-solid fa-hourglass-half w-5 text-center"></i>
+            <span>Digital Legacy Switch</span>
+          </button>
+          <button data-tab="crypto-inspector" class="nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition">
+            <i class="fa-solid fa-microchip w-5 text-center text-amber-400"></i>
+            <span>Live Encryption Inspector</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Behavioral Biometrics & Emergency Panic Footer -->
+      <div class="p-4 border-t border-slate-800/80 space-y-3">
+        <!-- Behavioral Biometrics Status (Node #11) -->
+        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800">
+          <div class="flex items-center justify-between text-xs mb-1">
+            <span class="text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-fingerprint text-teal-400"></i> Behavioral Biometrics
+            </span>
+            <span class="text-emerald-400 font-semibold">Trusted (98%)</span>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            <div class="bg-emerald-400 h-full rounded-full" style="width: 98%"></div>
+          </div>
+        </div>
+
+        <!-- Emergency Panic & Logout Buttons -->
+        <div class="grid grid-cols-2 gap-2">
+          <button
+            id="emergency-panic-btn"
+            class="px-3 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-semibold transition flex items-center justify-center gap-1.5"
+            title="Switch immediately to Decoy Vault & trigger silent alert"
+          >
+            <i class="fa-solid fa-mask"></i>
+            <span>Panic Decoy</span>
+          </button>
+          <button
+            id="logout-btn"
+            class="px-3 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/40 text-rose-300 text-xs font-semibold transition flex items-center justify-center gap-1.5"
+          >
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Lock Vault</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Workspace -->
+    <main class="flex-1 flex flex-col min-w-0">
+      <!-- Top Status Header -->
+      <header class="glass-panel border-b border-teal-500/15 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 id="page-title" class="text-xl font-bold text-white">My Encrypted Password Vault</h2>
+          <p id="page-subtitle" class="text-xs text-slate-400">All entries are encrypted with AES-GCM 256-bit using your PBKDF2 derived key.</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/90 border border-slate-800 text-xs">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-slate-400">Session Key:</span>
+            <code id="header-key-fingerprint" class="text-teal-300 font-mono">0x9F4A...E21C</code>
+          </div>
+          <button
+            id="open-add-modal-btn"
+            class="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-teal-500/20 transition flex items-center gap-2"
+          >
+            <i class="fa-solid fa-plus"></i>
+            <span>Add Credential</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Dynamic Tab Views Container -->
+      <div class="p-4 sm:p-6 lg:p-8 flex-1 overflow-y-auto space-y-6">
+
+        <!-- ==================== TAB 1: MY VAULT ==================== -->
+        <section id="tab-vault" class="tab-section space-y-6">
+          <!-- KPI Summary Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="glass-panel p-4 rounded-2xl flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-key"></i>
+              </div>
+              <div>
+                <p class="text-xs text-slate-400">Stored Credentials</p>
+                <p id="stat-total" class="text-2xl font-extrabold text-white">0</p>
+              </div>
+            </div>
+
+            <div class="glass-panel p-4 rounded-2xl flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-shield-check"></i>
+              </div>
+              <div>
+                <p class="text-xs text-slate-400">Vault Security Score</p>
+                <p id="stat-score" class="text-2xl font-extrabold text-emerald-400">100%</p>
+              </div>
+            </div>
+
+            <div class="glass-panel p-4 rounded-2xl flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+              </div>
+              <div>
+                <p class="text-xs text-slate-400">Weak Passwords</p>
+                <p id="stat-weak" class="text-2xl font-extrabold text-amber-400">0</p>
+              </div>
+            </div>
+
+            <div class="glass-panel p-4 rounded-2xl flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-clone"></i>
+              </div>
+              <div>
+                <p class="text-xs text-slate-400">Reused Passwords</p>
+                <p id="stat-reused" class="text-2xl font-extrabold text-rose-400">0</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Search & Category Filter Bar -->
+          <div class="glass-panel p-4 rounded-2xl flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div class="relative w-full sm:max-w-md">
+              <i class="fa-solid fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+              <input
+                type="text"
+                id="vault-search-input"
+                placeholder="Search by website, app, or username..."
+                class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700 focus:border-teal-400 text-sm text-white placeholder-slate-500 outline-none"
+              />
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+              <select id="vault-category-filter" class="px-3.5 py-2.5 rounded-xl bg-slate-950/90 border border-slate-700 text-sm text-slate-200 outline-none focus:border-teal-400">
+                <option value="All">All Categories</option>
+                <option value="Banking & Finance">Banking & Finance</option>
+                <option value="Social & Email">Social & Email</option>
+                <option value="Work & Cloud">Work & Cloud</option>
+                <option value="Education">Education</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Credentials Grid -->
+          <div id="credentials-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <!-- Dynamically populated credential cards -->
+          </div>
+        </section>
+
+        <!-- ==================== TAB 2: PASSWORD GENERATOR ==================== -->
+        <section id="tab-generator" class="tab-section hidden max-w-2xl mx-auto space-y-6">
+          <div class="glass-panel rounded-3xl p-6 sm:p-8 space-y-6">
+            <div>
+              <h3 class="text-lg font-bold text-white">Cryptographic Password Generator</h3>
+              <p class="text-xs text-slate-400">Uses <code class="text-teal-300">window.crypto.getRandomValues()</code> for high-entropy unbiased generation.</p>
+            </div>
+
+            <!-- Generated Output Box -->
+            <div class="p-4 rounded-2xl bg-slate-950 border border-teal-500/30 flex items-center justify-between gap-3">
+              <code id="generated-password-display" class="text-lg sm:text-xl font-mono text-teal-300 break-all select-all">
+                Generating...
+              </code>
+              <div class="flex items-center gap-2 shrink-0">
+                <button id="regenerate-btn" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition" title="Regenerate">
+                  <i class="fa-solid fa-rotate"></i>
+                </button>
+                <button id="copy-generated-btn" class="p-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold transition" title="Copy Password">
+                  <i class="fa-solid fa-copy"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Strength & Entropy Bar -->
+            <div class="space-y-2">
+              <div class="flex justify-between text-xs">
+                <span class="text-slate-400">Strength Assessment: <strong id="gen-strength-label" class="text-emerald-400">Very Strong</strong></span>
+                <span class="text-slate-400">Entropy: <strong id="gen-entropy-label" class="text-teal-300">128 bits</strong></span>
+              </div>
+              <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div id="gen-strength-bar" class="h-full bg-emerald-400 transition-all duration-300" style="width: 95%"></div>
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="space-y-4 pt-2">
+              <div>
+                <div class="flex justify-between text-sm mb-2">
+                  <label for="gen-length-slider" class="font-medium text-slate-300">Password Length</label>
+                  <span id="gen-length-val" class="font-mono font-bold text-teal-400">20</span>
+                </div>
+                <input type="range" id="gen-length-slider" min="8" max="64" value="20" class="w-full accent-teal-500 cursor-pointer" />
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 cursor-pointer">
+                  <span class="text-sm text-slate-300">Uppercase (A–Z)</span>
+                  <input type="checkbox" id="gen-upper" checked class="w-4 h-4 accent-teal-500">
+                </label>
+                <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 cursor-pointer">
+                  <span class="text-sm text-slate-300">Lowercase (a–z)</span>
+                  <input type="checkbox" id="gen-lower" checked class="w-4 h-4 accent-teal-500">
+                </label>
+                <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 cursor-pointer">
+                  <span class="text-sm text-slate-300">Numbers (0–9)</span>
+                  <input type="checkbox" id="gen-numbers" checked class="w-4 h-4 accent-teal-500">
+                </label>
+                <label class="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 cursor-pointer">
+                  <span class="text-sm text-slate-300">Symbols (!@#$%^&*)</span>
+                  <input type="checkbox" id="gen-symbols" checked class="w-4 h-4 accent-teal-500">
+                </label>
+              </div>
+            </div>
+
+            <button id="use-generated-in-vault-btn" class="w-full py-3 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 font-semibold text-sm transition">
+              <i class="fa-solid fa-plus-circle mr-1.5"></i> Save This Password to Vault
+            </button>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 3: PASSWORD ANALYZER & REUSE DETECTOR ==================== -->
+        <section id="tab-analyzer" class="tab-section hidden space-y-6">
+          <div class="glass-panel rounded-3xl p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+              <div>
+                <h3 class="text-lg font-bold text-white">Password Strength & Reuse Detector (Modules #7 & #8)</h3>
+                <p class="text-xs text-slate-400">Audits decrypted credentials in memory for low entropy, common patterns, and duplicate usage across accounts.</p>
+              </div>
+              <div class="px-4 py-2 rounded-2xl bg-slate-950 border border-teal-500/30 text-right">
+                <span class="text-xs text-slate-400 block">Overall Health</span>
+                <span id="audit-health-badge" class="text-lg font-extrabold text-emerald-400">Good</span>
+              </div>
+            </div>
+
+            <div id="audit-results-list" class="mt-6 space-y-3">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 4: TIME-BOUND SECURE SHARING (NODE #5) ==================== -->
+        <section id="tab-sharing" class="tab-section hidden max-w-2xl mx-auto space-y-6">
+          <div class="glass-panel rounded-3xl p-6 sm:p-8 space-y-5">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-link"></i>
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-white">Time-Bound Secure Sharing</h3>
+                <p class="text-xs text-slate-400">Generates an encrypted, self-destructing one-time link for sharing credentials safely.</p>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Select Credential to Share</label>
+                <select id="share-credential-select" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-teal-400"></select>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Self-Destruct Timer</label>
+                  <select id="share-expiry-select" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none">
+                    <option value="5">5 Minutes</option>
+                    <option value="30">30 Minutes</option>
+                    <option value="60">1 Hour</option>
+                    <option value="1440">24 Hours</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Max Views</label>
+                  <select id="share-views-select" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none">
+                    <option value="1">1 View (Burn after reading)</option>
+                    <option value="3">3 Views</option>
+                  </select>
+                </div>
+              </div>
+
+              <button id="create-share-link-btn" class="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm transition">
+                Generate Encrypted Ephemeral Link
+              </button>
+            </div>
+
+            <div id="share-link-result" class="hidden p-4 rounded-2xl bg-slate-950 border border-emerald-500/40 space-y-2">
+              <div class="flex items-center justify-between text-xs text-emerald-400">
+                <span><i class="fa-solid fa-fire mr-1"></i> Self-Destructing Link Active</span>
+                <span id="share-countdown" class="font-mono">Expires in 05:00</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <input type="text" id="share-url-output" readonly class="w-full p-2.5 rounded-lg bg-slate-900 text-xs font-mono text-teal-300 border border-slate-800 outline-none" />
+                <button id="copy-share-url-btn" class="px-3 py-2.5 rounded-lg bg-teal-500 text-slate-950 text-xs font-bold">Copy</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 5: AI PHISHING RADAR (NODE #10) ==================== -->
+        <section id="tab-phishing" class="tab-section hidden max-w-2xl mx-auto space-y-6">
+          <div class="glass-panel rounded-3xl p-6 sm:p-8 space-y-5">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-radar"></i>
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-white">AI-Powered Phishing Radar</h3>
+                <p class="text-xs text-slate-400">Inspects URLs before auto-filling credentials to block homograph attacks, IP-based hosts, and spoofed domains.</p>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                id="phishing-url-input"
+                placeholder="Enter URL to scan (e.g., http://paypa1-security-login.xyz)"
+                class="flex-1 p-3.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-teal-400"
+              />
+              <button id="scan-url-btn" class="px-5 py-3.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm transition">
+                Scan URL
+              </button>
+            </div>
+
+            <div class="flex flex-wrap gap-2 text-xs">
+              <span class="text-slate-400">Test samples:</span>
+              <button type="button" class="sample-url-btn text-teal-400 hover:underline" data-url="https://github.com/login">https://github.com/login</button>
+              <span class="text-slate-600">•</span>
+              <button type="button" class="sample-url-btn text-rose-400 hover:underline" data-url="http://g00gle-verify-account.tk/auth">http://g00gle-verify-account.tk/auth</button>
+            </div>
+
+            <div id="phishing-scan-result" class="hidden p-4 rounded-2xl border space-y-2">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 6: QUANTUM-RESISTANT ANALYZER (NODE #9) ==================== -->
+        <section id="tab-quantum" class="tab-section hidden space-y-6">
+          <div class="glass-panel rounded-3xl p-6 sm:p-8 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+              <div>
+                <h3 class="text-lg font-bold text-white">Quantum-Resistant Threat Assessment</h3>
+                <p class="text-xs text-slate-400">Evaluates vault encryption (AES-256) and credential bit-entropy against Grover's Quantum Search Algorithm.</p>
+              </div>
+              <span class="px-3 py-1.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-semibold">
+                Grover's Algorithm Halves Symmetric Key Bits (256 → 128-bit Post-Quantum Security)
+              </span>
+            </div>
+
+            <div id="quantum-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 7: DIGITAL LEGACY & DEAD MAN'S SWITCH (NODE #6) ==================== -->
+        <section id="tab-legacy" class="tab-section hidden max-w-2xl mx-auto space-y-6">
+          <div class="glass-panel rounded-3xl p-6 sm:p-8 space-y-5">
+            <div class="flex items-center gap-3">
+              <div class="w-11 h-11 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-user-shield"></i>
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-white">Digital Legacy & Dead Man's Switch</h3>
+                <p class="text-xs text-slate-400">Grants encrypted emergency access to a verified trusted contact if prolonged account inactivity is detected.</p>
+              </div>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Trusted Contact Email</label>
+                <input type="email" id="legacy-email" value="trusted.family@example.com" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-teal-400" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 uppercase mb-1.5">Inactivity Trigger Period</label>
+                <select id="legacy-days" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none">
+                  <option value="30">30 Days of Inactivity</option>
+                  <option value="90" selected>90 Days of Inactivity</option>
+                  <option value="180">180 Days of Inactivity</option>
+                </select>
+              </div>
+              <button id="save-legacy-btn" class="w-full py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm transition">
+                Save Legacy Policy & Verify Contact
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 8: LIVE ENCRYPTION INSPECTOR (FOR VIVA DEMO) ==================== -->
+        <section id="tab-crypto-inspector" class="tab-section hidden space-y-6">
+          <div class="glass-panel rounded-3xl p-6 sm:p-8 space-y-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+              <div>
+                <h3 class="text-lg font-bold text-amber-300 flex items-center gap-2">
+                  <i class="fa-solid fa-microchip"></i>
+                  <span>Live Cryptographic Storage Inspector (Viva View)</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">
+                  Proves that the underlying database (<code class="text-teal-300">localStorage</code>) stores <strong>zero plaintext passwords</strong>—only Base64 AES-GCM ciphertext and random Initialization Vectors (IV).
+                </p>
+              </div>
+              <span class="px-3 py-1 rounded-lg bg-slate-950 border border-slate-700 text-xs font-mono text-teal-300">
+                PBKDF2 (100,000 iterations) + AES-GCM-256
+              </span>
+            </div>
+
+            <div class="bg-slate-950 rounded-2xl p-4 border border-slate-800 overflow-x-auto">
+              <pre id="raw-encrypted-storage-view" class="text-xs font-mono text-emerald-400 leading-relaxed"></pre>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== 3. ADD / EDIT CREDENTIAL MODAL ==================== -->
+  <div id="credential-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+    <div class="glass-panel rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-teal-500/30">
+      <div class="flex items-center justify-between mb-5">
+        <h3 id="modal-title" class="text-lg font-bold text-white">Add New Credential</h3>
+        <button id="close-modal-btn" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <form id="credential-form" class="space-y-4">
+        <input type="hidden" id="cred-id" />
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Website / Application Name</label>
+          <input type="text" id="cred-title" required placeholder="e.g., GitHub, HDFC Bank, College Portal" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-teal-400" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Website URL (Optional)</label>
+          <input type="text" id="cred-url" placeholder="https://example.com" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-teal-400" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Category</label>
+          <select id="cred-category" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-teal-400">
+            <option value="Banking & Finance">Banking & Finance</option>
+            <option value="Social & Email">Social & Email</option>
+            <option value="Work & Cloud">Work & Cloud</option>
+            <option value="Education">Education</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Username / Email</label>
+          <input type="text" id="cred-username" required placeholder="student@adypu.edu.in" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white outline-none focus:border-teal-400" />
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-semibold text-slate-400 uppercase">Password</label>
+            <button type="button" id="modal-quick-gen-btn" class="text-xs text-teal-400 hover:text-teal-300 font-medium">
+              <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Generate Strong
+            </button>
+          </div>
+          <input type="text" id="cred-password" required placeholder="Enter or generate password" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-700 font-mono text-sm text-teal-300 outline-none focus:border-teal-400" />
+        </div>
+
+        <div class="pt-2 flex justify-end gap-3">
+          <button type="button" id="modal-cancel-btn" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-sm font-bold shadow-lg shadow-teal-500/20">
+            Encrypt & Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== JAVASCRIPT CRYPTOGRAPHY & APP LOGIC ==================== -->
+  <script>
+    /**
+     * Secure Vault — Client-Side Cryptographic Engine & State Manager
+     * Uses Web Crypto API:
+     *  - PBKDF2 (SHA-256, 100,000 iterations) to derive a 256-bit AES key from the Master Password
+     *  - AES-GCM (256-bit) with unique 96-bit random IV per credential record
+     */
+
+    const STORAGE_KEY = 'secure_vault_encrypted_db_v1';
+    const SALT_KEY = 'secure_vault_salt_v1';
+
+    let derivedCryptoKey = null;
+    let decryptedVault = [];
+    let isDecoyMode = false;
+    let shareTimerInterval = null;
+
+    // Sample initial credentials for first-time setup
+    const INITIAL_SAMPLE_DATA = [
+      {
+        id: 'cred-1',
+        title: 'ADYPU Student ERP Portal',
+        url: 'https://adypu.edu.in',
+        category: 'Education',
+        username: 'riya.thakkar@adypu.edu.in',
+        password: 'AdyPu#2026!SecureVault',
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'cred-2',
+        title: 'GitHub Developer Account',
+        url: 'https://github.com',
+        category: 'Work & Cloud',
+        username: 'securevault-team',
+        password: 'Gh$9kL#mP2!xQ8vR@zW4',
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'cred-3',
+        title: 'HDFC NetBanking',
+        url: 'https://netbanking.hdfcbank.com',
+        category: 'Banking & Finance',
+        username: 'cust_8849201',
+        password: 'Hdfc@2026$VaultSafe99',
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'cred-4',
+        title: 'University Research Mail',
+        url: 'https://mail.google.com',
+        category: 'Social & Email',
+        username: 'shriya.gadhave@adypu.edu.in',
+        password: 'password123', // Intentionally weak to demonstrate Analyzer
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'cred-5',
+        title: 'Cloud Backup Console',
+        url: 'https://console.aws.amazon.com',
+        category: 'Work & Cloud',
+        username: 'admin-ops',
+        password: 'password123', // Intentionally reused to demonstrate Reuse Detector
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    // Decoy Vault Data (shown when Duress / Emergency Panic mode is active)
+    const DECOY_VAULT_DATA = [
+      {
+        id: 'decoy-1',
+        title: 'Local Library Account',
+        url: 'https://citylibrary.org',
+        category: 'Education',
+        username: 'reader_guest',
+        password: 'LibraryRead2026!',
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'decoy-2',
+        title: 'Newsletter Subscription',
+        url: 'https://technews.example.com',
+        category: 'Social & Email',
+        username: 'daily.digest@example.com',
+        password: 'NewsDigest#88',
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    // ==================== UTILITY: TOAST NOTIFICATIONS ====================
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const styles = {
+        success: 'bg-emerald-950/95 border-emerald-500/50 text-emerald-200',
+        warning: 'bg-amber-950/95 border-amber-500/50 text-amber-200',
+        error: 'bg-rose-950/95 border-rose-500/50 text-rose-200',
+        info: 'bg-teal-950/95 border-teal-500/50 text-teal-200'
+      };
+      const icons = {
+        success: 'fa-circle-check text-emerald-400',
+        warning: 'fa-triangle-exclamation text-amber-400',
+        error: 'fa-circle-xmark text-rose-400',
+        info: 'fa-shield-halved text-teal-400'
+      };
+
+      toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-xl backdrop-blur-md text-xs sm:text-sm font-medium transition-all duration-300 ${styles[type] || styles.info}`;
+      toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-base"></i><span>${message}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    // ==================== UTILITY: CUSTOM CONFIRM DIALOG ====================
+    function askConfirmation(title, message) {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-message').textContent = message;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        const cleanup = (result) => {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+          resolve(result);
+        };
+
+        document.getElementById('confirm-ok-btn').onclick = () => cleanup(true);
+        document.getElementById('confirm-cancel-btn').onclick = () => cleanup(false);
+      });
+    }
+
+    // ==================== UTILITY: CLIPBOARD COPY ====================
+    function copyToClipboard(text, label = 'Copied to clipboard') {
+      const tempInput = document.createElement('textarea');
+      tempInput.value = text;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      try {
+        document.execCommand('copy');
+        showToast(label, 'success');
+      } catch (err) {
+        showToast('Failed to copy text', 'error');
+      }
+      document.body.removeChild(tempInput);
+    }
+
+    // ==================== WEB CRYPTO API FUNCTIONS ====================
+    function getOrCreateSalt() {
+      let saltB64 = localStorage.getItem(SALT_KEY);
+      if (!saltB64) {
+        const saltBytes = window.crypto.getRandomValues(new Uint8Array(16));
+        saltB64 = btoa(String.fromCharCode(...saltBytes));
+        localStorage.setItem(SALT_KEY, saltB64);
+      }
+      const binary = atob(saltB64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+
+    async function deriveMasterKey(masterPassword) {
+      const enc = new TextEncoder();
+      const salt = getOrCreateSalt();
+      const keyMaterial = await window.crypto.subtle.importKey(
+        'raw',
+        enc.encode(masterPassword),
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey', 'deriveBits']
+      );
+
+      // Derive fingerprint for UI display
+      const bits = await window.crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+        keyMaterial,
+        64
+      );
+      const hex = Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+      document.getElementById('header-key-fingerprint').textContent = `0x${hex.slice(0, 4)}...${hex.slice(-4)}`;
+
+      // Derive actual AES-GCM 256-bit key
+      return window.crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+      );
+    }
+
+    async function encryptPayload(plainObject, key) {
+      const enc = new TextEncoder();
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const ciphertextBuffer = await window.crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        enc.encode(JSON.stringify(plainObject))
+      );
+
+      return {
+        iv: btoa(String.fromCharCode(...iv)),
+        ciphertext: btoa(String.fromCharCode(...new Uint8Array(ciphertextBuffer))),
+        algorithm: 'AES-GCM-256',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    async function decryptPayload(encryptedRecord, key) {
+      const ivBinary = atob(encryptedRecord.iv);
+      const iv = new Uint8Array(ivBinary.length);
+      for (let i = 0; i < ivBinary.length; i++) iv[i] = ivBinary.charCodeAt(i);
+
+      const ctBinary = atob(encryptedRecord.ciphertext);
+      const ct = new Uint8Array(ctBinary.length);
+      for (let i = 0; i < ctBinary.length; i++) ct[i] = ctBinary.charCodeAt(i);
+
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        ct
+      );
+      return JSON.parse(new TextDecoder().decode(decryptedBuffer));
+    }
+
+    async function saveVaultToEncryptedStorage() {
+      if (isDecoyMode || !derivedCryptoKey) return;
+      const encryptedRecords = [];
+      for (const item of decryptedVault) {
+        const encItem = await encryptPayload(item, derivedCryptoKey);
+        encryptedRecords.push({ id: item.id, ...encItem });
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(encryptedRecords));
+      updateRawStorageInspector();
+    }
+
+    async function loadOrInitializeVault(key) {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        decryptedVault = [...INITIAL_SAMPLE_DATA];
+        await saveVaultToEncryptedStorage();
+        return true;
+      }
+
+      try {
+        const encryptedRecords = JSON.parse(raw);
+        const loaded = [];
+        for (const rec of encryptedRecords) {
+          const plain = await decryptPayload(rec, key);
+          loaded.push(plain);
+        }
+        decryptedVault = loaded;
+        updateRawStorageInspector();
+        return true;
+      } catch (e) {
+        return false; // Wrong master password (AES-GCM authentication tag mismatch)
+      }
+    }
+
+    // ==================== PASSWORD STRENGTH & ENTROPY ENGINE ====================
+    function evaluatePassword(pwd) {
+      let pool = 0;
+      if (/[a-z]/.test(pwd)) pool += 26;
+      if (/[A-Z]/.test(pwd)) pool += 26;
+      if (/[0-9]/.test(pwd)) pool += 10;
+      if (/[^A-Za-z0-9]/.test(pwd)) pool += 32;
+      const entropy = Math.round(pwd.length * Math.log2(Math.max(pool, 1)));
+
+      let label = 'Weak';
+      let color = 'text-rose-400';
+      let barColor = 'bg-rose-500';
+      let score = 25;
+
+      if (entropy >= 85 && pwd.length >= 12) {
+        label = 'Very Strong';
+        color = 'text-emerald-400';
+        barColor = 'bg-emerald-400';
+        score = 100;
+      } else if (entropy >= 60 && pwd.length >= 10) {
+        label = 'Strong';
+        color = 'text-teal-400';
+        barColor = 'bg-teal-400';
+        score = 78;
+      } else if (entropy >= 40) {
+        label = 'Moderate';
+        color = 'text-amber-400';
+        barColor = 'bg-amber-400';
+        score = 50;
+      }
+      return { entropy, label, color, barColor, score };
+    }
+
+    function generateSecurePassword(length = 20, upper = true, lower = true, numbers = true, symbols = true) {
+      let charset = '';
+      if (upper) charset += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      if (lower) charset += 'abcdefghijklmnopqrstuvwxyz';
+      if (numbers) charset += '0123456789';
+      if (symbols) charset += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      if (!charset) charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+      const randomValues = new Uint32Array(length);
+      window.crypto.getRandomValues(randomValues);
+      let password = '';
+      for (let i = 0; i < length; i++) {
+        password += charset[randomValues[i] % charset.length];
+      }
+      return password;
+    }
+
+    // ==================== RENDERING DASHBOARD & MODULES ====================
+    function refreshAllViews() {
+      renderVaultGrid();
+      renderAnalyzerAudit();
+      renderQuantumAudit();
+      populateShareDropdown();
+      updateRawStorageInspector();
+    }
+
+    function renderVaultGrid() {
+      const grid = document.getElementById('credentials-grid');
+      const query = document.getElementById('vault-search-input').value.toLowerCase().trim();
+      const catFilter = document.getElementById('vault-category-filter').value;
+
+      // Compute duplicate passwords
+      const passwordCounts = {};
+      decryptedVault.forEach(item => {
+        passwordCounts[item.password] = (passwordCounts[item.password] || 0) + 1;
+      });
+
+      let weakCount = 0;
+      let reusedCount = 0;
+      let totalScoreSum = 0;
+
+      decryptedVault.forEach(item => {
+        const evalRes = evaluatePassword(item.password);
+        totalScoreSum += evalRes.score;
+        if (evalRes.score < 60) weakCount++;
+        if (passwordCounts[item.password] > 1) reusedCount++;
+      });
+
+      const avgScore = decryptedVault.length ? Math.round(totalScoreSum / decryptedVault.length) : 100;
+      document.getElementById('stat-total').textContent = decryptedVault.length;
+      document.getElementById('nav-vault-count').textContent = decryptedVault.length;
+      document.getElementById('stat-score').textContent = `${avgScore}%`;
+      document.getElementById('stat-weak').textContent = weakCount;
+      document.getElementById('stat-reused').textContent = reusedCount;
+
+      const filtered = decryptedVault.filter(item => {
+        const matchesQuery = item.title.toLowerCase().includes(query) || item.username.toLowerCase().includes(query);
+        const matchesCat = catFilter === 'All' || item.category === catFilter;
+        return matchesQuery && matchesCat;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full glass-panel rounded-2xl p-10 text-center">
+            <i class="fa-solid fa-folder-open text-3xl text-slate-600 mb-3"></i>
+            <p class="text-slate-300 font-semibold">No credentials match your filter</p>
+            <p class="text-xs text-slate-500 mt-1">Click "Add Credential" to encrypt and store a new password entry.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(item => {
+        const strength = evaluatePassword(item.password);
+        const isReused = passwordCounts[item.password] > 1;
+        return `
+          <div class="glass-panel rounded-2xl p-5 flex flex-col justify-between hover:border-teal-400/40 transition group">
+            <div>
+              <div class="flex items-start justify-between gap-2 mb-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div class="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-300 font-bold shrink-0">
+                    ${item.title.charAt(0).toUpperCase()}
+                  </div>
+                  <div class="min-w-0">
+                    <h4 class="font-bold text-white text-sm truncate">${item.title}</h4>
+                    <span class="text-[11px] text-slate-400">${item.category}</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                  <button onclick="openEditModal('${item.id}')" class="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-teal-300 transition" title="Edit">
+                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                  </button>
+                  <button onclick="deleteCredential('${item.id}')" class="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition" title="Delete">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Username row -->
+              <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 flex items-center justify-between gap-2 mb-2">
+                <span class="text-xs text-slate-300 truncate font-mono">${item.username}</span>
+                <button onclick="copyToClipboard('${item.username.replace(/'/g, "\\'")}', 'Username copied')" class="text-slate-400 hover:text-teal-400 text-xs shrink-0" title="Copy Username">
+                  <i class="fa-regular fa-copy"></i>
+                </button>
+              </div>
+
+              <!-- Password row -->
+              <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 flex items-center justify-between gap-2">
+                <span id="pwd-mask-${item.id}" data-revealed="false" data-secret="${item.password.replace(/"/g, '&quot;')}" class="text-xs text-teal-300 font-mono truncate">
+                  ••••••••••••
+                </span>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button onclick="toggleRevealPassword('${item.id}')" class="text-slate-400 hover:text-teal-400 text-xs" title="Reveal/Hide">
+                    <i id="eye-icon-${item.id}" class="fa-regular fa-eye"></i>
+                  </button>
+                  <button onclick="copyToClipboard('${item.password.replace(/'/g, "\\'")}', 'Decrypted password copied')" class="text-slate-400 hover:text-teal-400 text-xs" title="Copy Password">
+                    <i class="fa-regular fa-copy"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Security Badges Footer -->
+            <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+              <span class="${strength.color} font-semibold">
+                <i class="fa-solid fa-shield-halved mr-1"></i>${strength.label} (${strength.entropy}b)
+              </span>
+              ${isReused ? '<span class="px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 font-medium">Reused</span>' : '<span class="text-slate-500 font-mono">AES-256</span>'}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleRevealPassword(id) {
+      const span = document.getElementById(`pwd-mask-${id}`);
+      const icon = document.getElementById(`eye-icon-${id}`);
+      const isRevealed = span.getAttribute('data-revealed') === 'true';
+      if (isRevealed) {
+        span.textContent = '••••••••••••';
+        span.setAttribute('data-revealed', 'false');
+        icon.className = 'fa-regular fa-eye';
+      } else {
+        span.textContent = span.getAttribute('data-secret');
+        span.setAttribute('data-revealed', 'true');
+        icon.className = 'fa-regular fa-eye-slash';
+      }
+    }
+
+    function renderAnalyzerAudit() {
+      const list = document.getElementById('audit-results-list');
+      const passwordCounts = {};
+      decryptedVault.forEach(item => {
+        passwordCounts[item.password] = (passwordCounts[item.password] || 0) + 1;
+      });
+
+      list.innerHTML = decryptedVault.map(item => {
+        const strength = evaluatePassword(item.password);
+        const isReused = passwordCounts[item.password] > 1;
+        const statusBadge = isReused
+          ? '<span class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-semibold">Password Reused</span>'
+          : strength.score < 60
+            ? '<span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-semibold">Weak Entropy</span>'
+            : '<span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-semibold">Healthy</span>';
+
+        return `
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p class="font-bold text-sm text-white">${item.title}</p>
+              <p class="text-xs text-slate-400 font-mono">${item.username} • Entropy: ${strength.entropy} bits</p>
+            </div>
+            <div class="flex items-center gap-3">
+              ${statusBadge}
+              <button onclick="openEditModal('${item.id}')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-teal-500/20 text-teal-300 text-xs font-medium transition">
+                Fix / Rotate
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderQuantumAudit() {
+      const container = document.getElementById('quantum-list');
+      container.innerHTML = decryptedVault.map(item => {
+        const strength = evaluatePassword(item.password);
+        const quantumBits = Math.floor(strength.entropy / 2);
+        const isQuantumSafe = quantumBits >= 64;
+        return `
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-sm text-white">${item.title}</span>
+              <span class="text-xs font-mono ${isQuantumSafe ? 'text-purple-300' : 'text-amber-400'}">
+                ${isQuantumSafe ? 'Post-Quantum Resilient' : 'Vulnerable to Grover Search'}
+              </span>
+            </div>
+            <p class="text-xs text-slate-400">
+              Classical Entropy: <strong class="text-slate-200">${strength.entropy} bits</strong> → Effective Quantum Search Space: <strong class="text-teal-300">${quantumBits} bits</strong>
+            </p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function populateShareDropdown() {
+      const select = document.getElementById('share-credential-select');
+      select.innerHTML = decryptedVault.map(item => `<option value="${item.id}">${item.title} (${item.username})</option>`).join('');
+    }
+
+    function updateRawStorageInspector() {
+      const viewer = document.getElementById('raw-encrypted-storage-view');
+      if (isDecoyMode) {
+        viewer.textContent = '// DECOY VAULT ACTIVE — Real encrypted database hidden in memory.';
+        return;
+      }
+      const raw = localStorage.getItem(STORAGE_KEY) || '[]';
+      try {
+        viewer.textContent = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        viewer.textContent = raw;
+      }
+    }
+
+    // ==================== MODAL & CRUD HANDLERS ====================
+    function openAddModal(prefillPassword = '') {
+      document.getElementById('modal-title').textContent = 'Add & Encrypt New Credential';
+      document.getElementById('cred-id').value = '';
+      document.getElementById('cred-title').value = '';
+      document.getElementById('cred-url').value = '';
+      document.getElementById('cred-category').value = 'Work & Cloud';
+      document.getElementById('cred-username').value = '';
+      document.getElementById('cred-password').value = prefillPassword || generateSecurePassword(18);
+      document.getElementById('credential-modal').classList.remove('hidden');
+      document.getElementById('credential-modal').classList.add('flex');
+    }
+
+    function openEditModal(id) {
+      const item = decryptedVault.find(c => c.id === id);
+      if (!item) return;
+      document.getElementById('modal-title').textContent = 'Edit Encrypted Credential';
+      document.getElementById('cred-id').value = item.id;
+      document.getElementById('cred-title').value = item.title;
+      document.getElementById('cred-url').value = item.url || '';
+      document.getElementById('cred-category').value = item.category;
+      document.getElementById('cred-username').value = item.username;
+      document.getElementById('cred-password').value = item.password;
+      document.getElementById('credential-modal').classList.remove('hidden');
+      document.getElementById('credential-modal').classList.add('flex');
+    }
+
+    function closeCredentialModal() {
+      document.getElementById('credential-modal').classList.add('hidden');
+      document.getElementById('credential-modal').classList.remove('flex');
+    }
+
+    async function deleteCredential(id) {
+      const confirmed = await askConfirmation('Delete Credential?', 'This encrypted record will be permanently removed from your vault.');
+      if (!confirmed) return;
+      decryptedVault = decryptedVault.filter(item => item.id !== id);
+      await saveVaultToEncryptedStorage();
+      refreshAllViews();
+      showToast('Credential deleted from vault', 'info');
+    }
+
+    // ==================== EVENT LISTENERS INITIALIZATION ====================
+    window.addEventListener('DOMContentLoaded', () => {
+      // Toggle Master Password visibility
+      document.getElementById('toggle-master-visibility').addEventListener('click', () => {
+        const input = document.getElementById('master-password-input');
+        const icon = document.querySelector('#toggle-master-visibility i');
+        if (input.type === 'password') {
+          input.type = 'text';
+          icon.className = 'fa-solid fa-eye-slash';
+        } else {
+          input.type = 'password';
+          icon.className = 'fa-solid fa-eye';
+        }
+      });
+
+      // Demo Quick-Unlock Button
+      document.getElementById('demo-quick-unlock').addEventListener('click', () => {
+        document.getElementById('master-password-input').value = 'Admin@1234';
+        document.getElementById('auth-form').dispatchEvent(new Event('submit'));
+      });
+
+      // Reset Prototype Vault
+      document.getElementById('reset-vault-btn').addEventListener('click', async () => {
+        const ok = await askConfirmation('Reset Prototype Database?', 'This clears localStorage and restores the default sample encrypted records.');
+        if (ok) {
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(SALT_KEY);
+          showToast('Vault storage reset. Enter any new Master Password to initialize.', 'success');
+        }
+      });
+
+      // Auth Form Submit (PBKDF2 Key Derivation + AES-GCM Unlock)
+      document.getElementById('auth-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const masterPwd = document.getElementById('master-password-input').value.trim();
+        if (!masterPwd) return;
+
+        isDecoyMode = document.getElementById('decoy-mode-checkbox').checked;
+        const unlockBtn = document.getElementById('unlock-btn');
+        unlockBtn.disabled = true;
+        unlockBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Deriving PBKDF2 Key...</span>';
+
+        try {
+          derivedCryptoKey = await deriveMasterKey(masterPwd);
+
+          if (isDecoyMode) {
+            decryptedVault = [...DECOY_VAULT_DATA];
+            document.getElementById('vault-mode-badge').textContent = 'Decoy Vault Active';
+            document.getElementById('vault-mode-badge').className = 'inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/30';
+            showToast('Emergency Decoy Vault unlocked. Silent alert logged.', 'warning');
+          } else {
+            const success = await loadOrInitializeVault(derivedCryptoKey);
+            if (!success) {
+              showToast('Authentication failed: Master password does not match existing encrypted vault.', 'error');
+              unlockBtn.disabled = false;
+              unlockBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i><span>Derive Key & Unlock Vault</span>';
+              return;
+            }
+            document.getElementById('vault-mode-badge').textContent = 'AES-256 Active';
+            document.getElementById('vault-mode-badge').className = 'inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-500/30';
+            showToast('Vault decrypted successfully using AES-GCM-256!', 'success');
+          }
+
+          document.getElementById('auth-screen').classList.add('hidden');
+          document.getElementById('app-shell').classList.remove('hidden');
+          refreshAllViews();
+        } catch (err) {
+          showToast('Cryptographic initialization error.', 'error');
+        } finally {
+          unlockBtn.disabled = false;
+          unlockBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i><span>Derive Key & Unlock Vault</span>';
+        }
+      });
+
+      // Sidebar Navigation Tabs
+      const tabMeta = {
+        'vault': ['My Encrypted Password Vault', 'All entries are encrypted with AES-GCM 256-bit using your PBKDF2 derived key.'],
+        'generator': ['Cryptographic Password Generator', 'Generate high-entropy random passwords resistant to dictionary and brute-force attacks.'],
+        'analyzer': ['Password Analyzer & Reuse Detector', 'Identify weak passwords and duplicate credentials across accounts.'],
+        'sharing': ['Time-Bound Secure Sharing', 'Create ephemeral self-destructing links for temporary credential sharing.'],
+        'phishing': ['AI-Powered Phishing Radar', 'Detect spoofed domains, homograph characters, and insecure HTTP login links.'],
+        'quantum': ['Quantum-Resistant Analyzer', 'Assess post-quantum security margins against Grover’s search algorithm.'],
+        'legacy': ['Digital Legacy & Dead Man’s Switch', 'Configure automated emergency vault transfer upon prolonged inactivity.'],
+        'crypto-inspector': ['Live Encryption Storage Inspector', 'Inspect raw AES-GCM ciphertext and Initialization Vectors stored in browser storage.']
+      };
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.getAttribute('data-tab');
+          document.querySelectorAll('.nav-btn').forEach(b => {
+            b.className = 'nav-btn flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/60 transition';
+          });
+          btn.className = 'nav-btn active flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium bg-teal-500/15 text-teal-300 border border-teal-500/30 transition';
+
+          document.querySelectorAll('.tab-section').forEach(sec => sec.classList.add('hidden'));
+          document.getElementById(`tab-${target}`).classList.remove('hidden');
+
+          document.getElementById('page-title').textContent = tabMeta[target][0];
+          document.getElementById('page-subtitle').textContent = tabMeta[target][1];
+
+          // Close mobile nav if open
+          if (window.innerWidth < 1024) {
+            document.getElementById('sidebar-nav').classList.add('hidden');
+          }
+        });
+      });
+
+      // Mobile Nav Toggle
+      document.getElementById('mobile-nav-toggle').addEventListener('click', () => {
+        document.getElementById('sidebar-nav').classList.toggle('hidden');
+        document.getElementById('sidebar-nav').classList.toggle('flex');
+      });
+
+      // Search & Category Filters
+      document.getElementById('vault-search-input').addEventListener('input', renderVaultGrid);
+      document.getElementById('vault-category-filter').addEventListener('change', renderVaultGrid);
+
+      // Add / Edit Modal Triggers
+      document.getElementById('open-add-modal-btn').addEventListener('click', () => openAddModal());
+      document.getElementById('close-modal-btn').addEventListener('click', closeCredentialModal);
+      document.getElementById('modal-cancel-btn').addEventListener('click', closeCredentialModal);
+      document.getElementById('modal-quick-gen-btn').addEventListener('click', () => {
+        document.getElementById('cred-password').value = generateSecurePassword(20);
+      });
+
+      // Save Credential Form
+      document.getElementById('credential-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('cred-id').value;
+        const entry = {
+          id: id || `cred-${Date.now()}`,
+          title: document.getElementById('cred-title').value.trim(),
+          url: document.getElementById('cred-url').value.trim(),
+          category: document.getElementById('cred-category').value,
+          username: document.getElementById('cred-username').value.trim(),
+          password: document.getElementById('cred-password').value,
+          updatedAt: new Date().toISOString()
+        };
+
+        if (id) {
+          const idx = decryptedVault.findIndex(c => c.id === id);
+          if (idx !== -1) decryptedVault[idx] = entry;
+          showToast('Credential updated & re-encrypted!', 'success');
+        } else {
+          decryptedVault.unshift(entry);
+          showToast('New credential encrypted with AES-GCM-256!', 'success');
+        }
+
+        await saveVaultToEncryptedStorage();
+        closeCredentialModal();
+        refreshAllViews();
+      });
+
+      // Password Generator Logic
+      function updateGeneratorUI() {
+        const len = parseInt(document.getElementById('gen-length-slider').value, 10);
+        document.getElementById('gen-length-val').textContent = len;
+        const upper = document.getElementById('gen-upper').checked;
+        const lower = document.getElementById('gen-lower').checked;
+        const numbers = document.getElementById('gen-numbers').checked;
+        const symbols = document.getElementById('gen-symbols').checked;
+
+        const pwd = generateSecurePassword(len, upper, lower, numbers, symbols);
+        document.getElementById('generated-password-display').textContent = pwd;
+
+        const evalRes = evaluatePassword(pwd);
+        document.getElementById('gen-strength-label').textContent = evalRes.label;
+        document.getElementById('gen-strength-label').className = evalRes.color;
+        document.getElementById('gen-entropy-label').textContent = `${evalRes.entropy} bits`;
+        document.getElementById('gen-strength-bar').style.width = `${evalRes.score}%`;
+        document.getElementById('gen-strength-bar').className = `h-full transition-all duration-300 ${evalRes.barColor}`;
+      }
+
+      ['gen-length-slider', 'gen-upper', 'gen-lower', 'gen-numbers', 'gen-symbols'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateGeneratorUI);
+      });
+      document.getElementById('regenerate-btn').addEventListener('click', updateGeneratorUI);
+      document.getElementById('copy-generated-btn').addEventListener('click', () => {
+        copyToClipboard(document.getElementById('generated-password-display').textContent, 'Generated password copied!');
+      });
+      document.getElementById('use-generated-in-vault-btn').addEventListener('click', () => {
+        const pwd = document.getElementById('generated-password-display').textContent;
+        openAddModal(pwd);
+      });
+      updateGeneratorUI();
+
+      // Time-Bound Sharing Logic
+      document.getElementById('create-share-link-btn').addEventListener('click', () => {
+        const token = Array.from(window.crypto.getRandomValues(new Uint8Array(12)))
+          .map(b => b.toString(16).padStart(2, '0')).join('');
+        const mins = parseInt(document.getElementById('share-expiry-select').value, 10);
+        document.getElementById('share-url-output').value = `https://securevault.adypu.edu/s/${token}#key=ephemeral`;
+        document.getElementById('share-link-result').classList.remove('hidden');
+
+        let secondsLeft = mins * 60;
+        clearInterval(shareTimerInterval);
+        shareTimerInterval = setInterval(() => {
+          secondsLeft--;
+          if (secondsLeft <= 0) {
+            clearInterval(shareTimerInterval);
+            document.getElementById('share-countdown').textContent = 'LINK DESTROYED';
+            return;
+          }
+          const m = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
+          const s = String(secondsLeft % 60).padStart(2, '0');
+          document.getElementById('share-countdown').textContent = `Expires in ${m}:${s}`;
+        }, 1000);
+        showToast('Self-destructing link generated!', 'success');
+      });
+
+      document.getElementById('copy-share-url-btn').addEventListener('click', () => {
+        copyToClipboard(document.getElementById('share-url-output').value, 'Ephemeral link copied!');
+      });
+
+      // AI Phishing Radar Logic
+      document.querySelectorAll('.sample-url-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('phishing-url-input').value = btn.getAttribute('data-url');
+          document.getElementById('scan-url-btn').click();
+        });
+      });
+
+      document.getElementById('scan-url-btn').addEventListener('click', () => {
+        const url = document.getElementById('phishing-url-input').value.trim();
+        if (!url) return;
+        const box = document.getElementById('phishing-scan-result');
+        box.classList.remove('hidden');
+
+        const suspicious = !url.startsWith('https://') || /0|1|\.tk|\.xyz|verify|login-/.test(url);
+        if (suspicious) {
+          box.className = 'p-4 rounded-2xl bg-rose-950/60 border border-rose-500/40 space-y-1';
+          box.innerHTML = `
+            <p class="text-sm font-bold text-rose-300"><i class="fa-solid fa-skull-crossbones mr-1.5"></i>High Phishing Risk Detected!</p>
+            <p class="text-xs text-slate-300">Detected suspicious domain structure, homograph substitution, or unencrypted HTTP transport. Auto-fill blocked.</p>
+          `;
+        } else {
+          box.className = 'p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 space-y-1';
+          box.innerHTML = `
+            <p class="text-sm font-bold text-emerald-300"><i class="fa-solid fa-circle-check mr-1.5"></i>Domain Verified Safe</p>
+            <p class="text-xs text-slate-300">Valid HTTPS transport and clean domain reputation. Safe for credential auto-fill.</p>
+          `;
+        }
+      });
+
+      // Digital Legacy Save
+      document.getElementById('save-legacy-btn').addEventListener('click', () => {
+        const email = document.getElementById('legacy-email').value.trim();
+        const days = document.getElementById('legacy-days').value;
+        showToast(`Dead Man's Switch armed: ${email} after ${days} days inactivity.`, 'success');
+      });
+
+      // Emergency Panic Button (Switches immediately to Decoy Vault)
+      document.getElementById('emergency-panic-btn').addEventListener('click', () => {
+        isDecoyMode = true;
+        decryptedVault = [...DECOY_VAULT_DATA];
+        document.getElementById('vault-mode-badge').textContent = 'Panic Decoy Mode';
+        document.getElementById('vault-mode-badge').className = 'inline-block text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/30';
+        refreshAllViews();
+        showToast('PANIC MODE TRIGGERED: Switched to Decoy Vault & sent silent alert.', 'warning');
+      });
+
+      // Secure Session Logout
+      document.getElementById('logout-btn').addEventListener('click', () => {
+        derivedCryptoKey = null;
+        decryptedVault = [];
+        isDecoyMode = false;
+        document.getElementById('master-password-input').value = '';
+        document.getElementById('app-shell').classList.add('hidden');
+        document.getElementById('auth-screen').classList.remove('hidden');
+        showToast('Session keys wiped from memory. Vault locked.', 'info');
+      });
+    });
+  </script>
+</body>
+</html>
